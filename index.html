@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seating Arrangement Generator</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+<style>
+    *{
+        border-radius: 5px;
+        border: none;
+    }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .container {
+        max-width: 600px; margin: auto; padding: 20px;
+        background: #f4f4f4; border-radius: 10px; border: 1px solid #ccc;
+    }
+    label { font-weight: bold; margin-top: 10px; display: block; }
+    input, textarea, button {
+        width: 100%; padding: 10px; margin-top: 5px;
+        font-size: 16px; box-sizing: border-box;
+    }
+    button {
+        background: #007bff; color: white; border: none;
+        margin-top: 15px; border-radius: 5px; cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    table {
+        margin-top: 20px; border-collapse: collapse; width: 100%;
+    }
+    td, th {
+        border: 1px solid #ccc; text-align: center; padding: 12px;
+        font-size: 18px;
+    }
+    th { background: #e3e3e3; }
+</style>
+</head>
+
+<body>
+    
+<div class="container">
+    <h2>Seating Arrangement Generator</h2>
+    <div class="row">
+        <div class="col">
+            <label>Dept1 From:</label>
+            <input type="number" id="from1">
+        </div>
+        <div class="col">
+            <label>Dept1 To:</label>
+            <input type="number" id="to1">
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col">
+            <label>Dept2 From:</label>
+            <input type="number" id="from2">
+        </div>
+        <div class="col">
+            <label>Dept2 To:</label>
+            <input type="number" id="to2">
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col">
+            <label>Skipped Dept1 RegNo:</label>
+            <textarea id="skip1" rows="1"></textarea>
+        </div>
+        <div class="col">
+            <label>Skipped Dept2 RegNo:</label>
+            <textarea id="skip2" rows="1"></textarea>
+        </div>
+    </div>
+    
+     <div class="row">
+        <div class="col">
+           <label>Total Rows:</label>
+            <input type="number" id="rows" placeholder="e.g. 6">
+        </div>
+        <div class="col">
+            <label>Total Columns:</label>
+            <input type="number" id="cols" placeholder="e.g. 5">
+        </div>
+    </div>
+    
+    <div class="row text-center">
+        <div class="col text-center">
+            <label>Total seats</label>
+            <input type="number" id="seats">
+        </div>
+    </div>
+
+
+    <button onclick="generateGrid()">Generate Seating Grid</button>
+    <button id="downloadBtn" onclick="downloadExcel()" disabled>Download Excel</button>
+
+    <div id="message" style="color:red; margin-top:10px;"></div>
+    <div id="table-area"></div>
+</div>
+
+<script>
+let halls = [];
+
+function parseSkipped(text) {
+    return text.split(",")
+        .map(x => x.trim())
+        .filter(x => x !== "")
+        .map(Number);
+}
+
+function generateList(from, to, skipped) {
+    let arr = [];
+    for (let i = from; i <= to; i++) {
+        if (!skipped.includes(i)) arr.push(i);
+    }
+    return arr;
+}
+
+function alternateMerge(list1, list2) {
+    let merged = [];
+    let i = 0, j = 0;
+
+    while (i < list1.length || j < list2.length) {
+        if (i < list1.length) merged.push(list1[i++]);
+        if (j < list2.length) merged.push(list2[j++]);
+    }
+    return merged;
+}
+
+function generateGrid() {
+    const from1 = parseInt(document.getElementById("from1").value);
+    const to1 = parseInt(document.getElementById("to1").value);
+
+    const from2 = parseInt(document.getElementById("from2").value);
+    const to2 = parseInt(document.getElementById("to2").value);
+
+    const rows = parseInt(document.getElementById("rows").value);
+    const cols = parseInt(document.getElementById("cols").value);
+
+    const skip1 = parseSkipped(document.getElementById("skip1").value);
+    const skip2 = parseSkipped(document.getElementById("skip2").value);
+
+    const total = rows * cols;
+    const field = document.getElementById('seats');
+    if (field) field.value = total;
+
+    const message = document.getElementById("message");
+    const tableArea = document.getElementById("table-area");
+    const downloadBtn = document.getElementById("downloadBtn");
+
+
+    message.innerText = "";
+    tableArea.innerHTML = "";
+    halls = [];
+    downloadBtn.disabled = true;
+
+    if ([from1,to1,from2,to2,rows,cols].some(isNaN)) {
+        message.innerText = "Please fill all fields.";
+        return;
+    }
+
+    let listDept1 = generateList(from1, to1, skip1);
+    let listDept2 = generateList(from2, to2, skip2);
+
+    let merged = alternateMerge(listDept1, listDept2);
+
+    const totalSeatsPerHall = rows * cols;
+    const totalStudents = merged.length;
+
+    if (totalStudents === 0) {
+        message.innerText = "No students to place.";
+        return;
+    }
+
+    const hallCount = Math.ceil(totalStudents / totalSeatsPerHall);
+
+    // Build halls
+    for (let h = 0; h < hallCount; h++) {
+        const start = h * totalSeatsPerHall;
+        const end = start + totalSeatsPerHall;
+        const assigned = merged.slice(start, end);
+
+        let idx = 0;
+        let grid = [];
+        for (let r = 0; r < rows; r++) {
+            let rowArr = [];
+            for (let c = 0; c < cols; c++) {
+                rowArr.push(assigned[idx] ? assigned[idx] : "");
+                idx++;
+            }
+            grid.push(rowArr);
+        }
+        halls.push({ hallNumber: h + 1, grid });
+    }
+
+    // Build tables for each hall
+    let html = "";
+    halls.forEach(hall => {
+        html += `<h3>Hall ${hall.hallNumber}</h3>`;
+        html += "<table><tbody>";
+        hall.grid.forEach((row, rIndex) => {
+            html += "<tr>";
+            row.forEach((col, cIndex) => {
+                const seatNo = (rIndex * cols) + cIndex + 1;
+                html += `<td><b>${seatNo}</b><br>${col}</td>`;
+            });
+            html += "</tr>";
+        });
+        html += "</tbody></table>";
+    });
+
+    tableArea.innerHTML = html;
+    message.innerText = `Total students: ${totalStudents}. Halls created: ${hallCount}. Seats per hall: ${totalSeatsPerHall}.`;
+    downloadBtn.disabled = false;
+}
+
+function downloadExcel() {
+    let csv = "Hall,Row,Column,Seat No,Register No\n";
+
+    halls.forEach(hall => {
+        let seatCounter = 1;
+        hall.grid.forEach((row, r) => {
+            row.forEach((value, c) => {
+                csv += `${hall.hallNumber},${r+1},${c+1},${seatCounter},${value}\n`;
+                seatCounter++;
+            });
+        });
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "alternate_seating_halls.csv";
+    link.click();
+}
+
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+
+</body>
+</html>
